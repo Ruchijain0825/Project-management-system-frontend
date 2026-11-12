@@ -25,20 +25,23 @@ import api from "../services/api";
 const Dashboard = () => {
   const navigate = useNavigate();
 
-  // States
+  // Navigation
   const [active, setActive] = useState("Overview");
 
+  // Project states
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState("");
 
+  // Ticket states
   const [tickets, setTickets] = useState([]);
 
+  // UI states
   const [loading, setLoading] = useState(true);
   const [ticketLoading, setTicketLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Modal states
   const [showModal, setShowModal] = useState(false);
-
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [editingTicket, setEditingTicket] = useState(null);
 
@@ -55,11 +58,11 @@ const Dashboard = () => {
 
       if (projectList.length > 0) {
         setSelectedProject((previous) => {
-          const stillExists = projectList.some(
+          const exists = projectList.some(
             (project) => project._id === previous
           );
 
-          return stillExists ? previous : projectList[0]._id;
+          return exists ? previous : projectList[0]._id;
         });
       } else {
         setSelectedProject("");
@@ -69,14 +72,15 @@ const Dashboard = () => {
       console.error("Fetch projects error:", error);
 
       setError(
-        error.response?.data?.message || "Failed to fetch projects"
+        error.response?.data?.message ||
+        "Failed to fetch projects"
       );
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Fetch tickets for selected project
+  // Fetch tickets
   const fetchTickets = useCallback(async () => {
     if (!selectedProject) {
       setTickets([]);
@@ -96,24 +100,25 @@ const Dashboard = () => {
       console.error("Fetch tickets error:", error);
 
       setError(
-        error.response?.data?.message || "Failed to fetch tickets"
+        error.response?.data?.message ||
+        "Failed to fetch tickets"
       );
     } finally {
       setTicketLoading(false);
     }
   }, [selectedProject]);
 
-  // Initial project fetch
+  // Initial projects load
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
 
-  // Fetch tickets whenever selected project changes
+  // Project change -> fetch tickets
   useEffect(() => {
     fetchTickets();
   }, [fetchTickets]);
 
-  // Refresh tickets after creating a ticket
+  // Refresh after ticket creation
   const handleTicketCreated = async () => {
     await fetchTickets();
     setShowModal(false);
@@ -130,9 +135,10 @@ const Dashboard = () => {
     setEditingTicket(ticket);
   };
 
-  // Update ticket
+  // After update
   const handleTicketUpdated = async () => {
     await fetchTickets();
+
     setEditingTicket(null);
     setSelectedTicket(null);
   };
@@ -149,7 +155,9 @@ const Dashboard = () => {
       await api.delete(`/tickets/${ticketId}`);
 
       setTickets((previous) =>
-        previous.filter((ticket) => ticket._id !== ticketId)
+        previous.filter(
+          (ticket) => ticket._id !== ticketId
+        )
       );
 
       setSelectedTicket(null);
@@ -158,7 +166,8 @@ const Dashboard = () => {
       console.error("Delete ticket error:", error);
 
       alert(
-        error.response?.data?.message || "Failed to delete ticket"
+        error.response?.data?.message ||
+        "Failed to delete ticket"
       );
     }
   };
@@ -198,7 +207,10 @@ const Dashboard = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Loading dashboard...</p>
+
+          <p className="text-gray-400">
+            Loading dashboard...
+          </p>
         </div>
       </div>
     );
@@ -207,17 +219,17 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col md:flex-row">
 
-      {/* Sidebar */}
+      {/* SIDEBAR */}
       <Sidebar
         active={active}
         setActive={setActive}
         onLogout={handleLogout}
       />
 
-      {/* Main Content */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 min-w-0">
 
-        {/* Header */}
+        {/* HEADER */}
         <Header
           projects={projects}
           selectedProject={selectedProject}
@@ -227,7 +239,7 @@ const Dashboard = () => {
 
         <div className="p-4 md:p-6 lg:p-8">
 
-          {/* Error Message */}
+          {/* ERROR MESSAGE */}
           {error && (
             <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
               <AlertCircle size={18} />
@@ -235,9 +247,10 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* No Projects */}
+          {/* NO PROJECTS */}
           {projects.length === 0 ? (
             <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
+
               <FolderKanban
                 size={55}
                 className="text-yellow-400 mb-4"
@@ -257,9 +270,11 @@ const Dashboard = () => {
               >
                 Go to Projects
               </button>
+
             </div>
           ) : (
             <>
+
               {/* OVERVIEW */}
               {active === "Overview" && (
                 <div className="space-y-7">
@@ -274,7 +289,7 @@ const Dashboard = () => {
                     </p>
                   </div>
 
-                  {/* Statistics */}
+                  {/* STATISTICS */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
                     <StatCard
@@ -303,9 +318,11 @@ const Dashboard = () => {
 
                   </div>
 
-                  {/* High Priority */}
+                  {/* HIGH PRIORITY */}
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+
                     <div className="flex items-center justify-between">
+
                       <div>
                         <p className="text-gray-400 text-sm">
                           High / Critical Priority
@@ -320,12 +337,16 @@ const Dashboard = () => {
                         size={30}
                         className="text-red-400"
                       />
+
                     </div>
+
                   </div>
 
-                  {/* Recent Tickets */}
+                  {/* RECENT TICKETS */}
                   <section>
+
                     <div className="flex items-center justify-between mb-4">
+
                       <h2 className="text-xl font-semibold">
                         Recent Tickets
                       </h2>
@@ -336,6 +357,7 @@ const Dashboard = () => {
                       >
                         View all
                       </button>
+
                     </div>
 
                     {ticketLoading ? (
@@ -344,6 +366,7 @@ const Dashboard = () => {
                       </p>
                     ) : tickets.length === 0 ? (
                       <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+
                         <Ticket
                           size={35}
                           className="mx-auto text-gray-500 mb-3"
@@ -352,14 +375,16 @@ const Dashboard = () => {
                         <p className="text-gray-400">
                           No tickets created yet.
                         </p>
+
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
                         {[...tickets]
                           .sort(
                             (a, b) =>
-                              new Date(b.createdAt) -
-                              new Date(a.createdAt)
+                              new Date(b.createdAt || 0) -
+                              new Date(a.createdAt || 0)
                           )
                           .slice(0, 4)
                           .map((ticket) => (
@@ -371,12 +396,15 @@ const Dashboard = () => {
                               }
                             />
                           ))}
+
                       </div>
                     )}
+
                   </section>
 
-                  {/* Quick Actions */}
+                  {/* QUICK ACTIONS */}
                   <section className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+
                     <h2 className="text-lg font-semibold mb-4">
                       Quick Actions
                     </h2>
@@ -388,6 +416,7 @@ const Dashboard = () => {
                       <Plus size={18} />
                       Create New Ticket
                     </button>
+
                   </section>
 
                 </div>
@@ -396,7 +425,9 @@ const Dashboard = () => {
               {/* PROJECTS */}
               {active === "Projects" && (
                 <section>
+
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+
                     <div>
                       <h1 className="text-2xl font-bold">
                         Projects
@@ -414,22 +445,26 @@ const Dashboard = () => {
                       <Plus size={18} />
                       Manage Projects
                     </button>
+
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+
                     {projects.map((project) => (
                       <div
                         key={project._id}
+                        onClick={() =>
+                          setSelectedProject(project._id)
+                        }
                         className={`bg-gray-900 border rounded-xl p-5 cursor-pointer transition ${
                           selectedProject === project._id
                             ? "border-yellow-400"
                             : "border-gray-800 hover:border-gray-600"
                         }`}
-                        onClick={() =>
-                          setSelectedProject(project._id)
-                        }
                       >
+
                         <div className="flex items-center justify-between mb-4">
+
                           <FolderKanban
                             size={25}
                             className="text-yellow-400"
@@ -438,6 +473,7 @@ const Dashboard = () => {
                           <span className="text-xs text-gray-400">
                             {project.teamMembers?.length || 0} members
                           </span>
+
                         </div>
 
                         <h3 className="font-semibold text-lg">
@@ -454,39 +490,45 @@ const Dashboard = () => {
                             ? "Selected project"
                             : "Click to select"}
                         </p>
+
                       </div>
                     ))}
+
                   </div>
+
                 </section>
               )}
 
-              {/* TICKETS / KANBAN */}
+              {/* TICKETS - SEARCH FILTER SORT KANBAN */}
               {active === "Tickets" && (
                 <section>
+
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+
                     <div>
                       <h1 className="text-2xl font-bold">
                         Ticket Board
                       </h1>
 
                       <p className="text-gray-400 mt-1">
-                        Manage tickets using drag and drop.
+                        Search, filter, sort and manage your tickets.
                       </p>
                     </div>
 
                     <button
                       onClick={() => setShowModal(true)}
-                      className="flex items-center gap-2 bg-yellow-400 text-black px-4 py-2 rounded-lg font-semibold"
+                      className="flex items-center gap-2 bg-yellow-400 text-black px-4 py-2 rounded-lg font-semibold hover:bg-yellow-300"
                     >
                       <Plus size={18} />
                       Create Ticket
                     </button>
+
                   </div>
 
                   {ticketLoading ? (
-                    <p className="text-gray-400">
+                    <div className="text-gray-400 py-8">
                       Loading tickets...
-                    </p>
+                    </div>
                   ) : (
                     <KanbanBoard
                       tickets={tickets}
@@ -494,12 +536,14 @@ const Dashboard = () => {
                       onTicketClick={handleTicketClick}
                     />
                   )}
+
                 </section>
               )}
 
               {/* TEAM */}
               {active === "Team" && (
                 <section>
+
                   <div className="mb-6">
                     <h1 className="text-2xl font-bold">
                       Team Members
@@ -538,6 +582,7 @@ const Dashboard = () => {
 
                     return uniqueMembers.length === 0 ? (
                       <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+
                         <Users
                           size={35}
                           className="mx-auto text-gray-500 mb-3"
@@ -546,14 +591,17 @@ const Dashboard = () => {
                         <p className="text-gray-400">
                           No team members found.
                         </p>
+
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+
                         {uniqueMembers.map((member) => (
                           <div
                             key={member._id}
                             className="bg-gray-900 border border-gray-800 rounded-xl p-5"
                           >
+
                             <div className="w-12 h-12 rounded-full bg-yellow-400 text-black flex items-center justify-center font-bold text-lg mb-3">
                               {member.name
                                 ?.charAt(0)
@@ -571,15 +619,20 @@ const Dashboard = () => {
                             <span className="inline-block mt-3 text-xs bg-gray-800 px-3 py-1 rounded-full text-yellow-400 capitalize">
                               {member.role || "Developer"}
                             </span>
+
                           </div>
                         ))}
+
                       </div>
                     );
                   })()}
+
                 </section>
               )}
+
             </>
           )}
+
         </div>
       </main>
 
