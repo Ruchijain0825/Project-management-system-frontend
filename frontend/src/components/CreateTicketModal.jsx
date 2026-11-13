@@ -26,29 +26,43 @@ const CreateTicketModal = ({
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  if (!projectId) {
+    setError("Please select a project first");
+    return;
+  }
+
+  if (form.title.trim().length < 3) {
+    setError("Title must contain at least 3 characters");
+    return;
+  }
+
+  try {
     setLoading(true);
     setError("");
 
-    try {
-      await api.post("/tickets", {
-        ...form,
-        projectId
-      });
+    await api.post("/tickets", {
+      ...form,
+      title: form.title.trim(),
+      description: form.description.trim(),
+      projectId
+    });
 
-      await onCreated();
-      onClose();
+    await onCreated();
+    onClose();
 
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-        "Unable to create ticket"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (err) {
+    setError(
+      err.response?.data?.message ||
+      "Unable to create ticket"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
