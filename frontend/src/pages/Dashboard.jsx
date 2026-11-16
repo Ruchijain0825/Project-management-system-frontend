@@ -10,7 +10,9 @@ import {
   Users,
   AlertCircle,
 } from "lucide-react";
-
+import { Sparkles } from "lucide-react";
+import AITicketGenerator from "../components/AITicketGenerator";
+import { Sparkles } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import StatCard from "../components/StatCard";
@@ -44,7 +46,7 @@ const Dashboard = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [editingTicket, setEditingTicket] = useState(null);
-
+  const [showAIModal, setShowAIModal] = useState(false);
   // Fetch projects
   const fetchProjects = useCallback(async () => {
     try {
@@ -416,6 +418,13 @@ const Dashboard = () => {
                       <Plus size={18} />
                       Create New Ticket
                     </button>
+                    <button
+                        onClick={() => setShowAIModal(true)}
+                        className="flex items-center gap-2 mt-3 bg-purple-500 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-purple-400"
+                    >
+                    <Sparkles size={18} />
+                    Generate Ticket with AI
+                    </button>
 
                   </section>
 
@@ -663,6 +672,14 @@ const Dashboard = () => {
           onUpdated={handleTicketUpdated}
         />
       )}
+
+      {showAIModal && (
+       <AITicketGenerator
+       projectId={selectedProject}
+       onClose={() => setShowAIModal(false)}
+       onCreated={fetchTickets}
+  />
+)}
 
     </div>
   );
