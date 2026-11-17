@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { Search, RotateCcw } from "lucide-react";
 
-import KanbanColumn from "./KanbanColumn";
+import KanbanColumn from "../components/KanbanColoumn";
 import api from "../services/api";
 
 const STATUSES = ["To Do", "In Progress", "Done"];

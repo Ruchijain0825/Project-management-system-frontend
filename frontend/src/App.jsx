@@ -1,35 +1,46 @@
 
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate
+} from "react-router-dom";
+
 import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
 
-function Dashboard() {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem("token");
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-white p-10">
-      <h1 className="text-3xl font-bold">
-        Welcome to TaskFlow, {user?.name}!
-      </h1>
-      <p className="mt-3 text-slate-400">
-        Your project management workspace.
-      </p>
-    </div>
-  );
+  return token
+    ? children
+    : <Navigate to="/" replace />;
+}
+
+function PublicRoute() {
+  const token = localStorage.getItem("token");
+
+  return token
+    ? <Navigate to="/dashboard" replace />
+    : <Auth />;
 }
 
 function App() {
-  const token = localStorage.getItem("token");
-
   return (
     <BrowserRouter>
       <Routes>
         <Route
           path="/"
-          element={token ? <Navigate to="/dashboard" /> : <Auth />}
+          element={<PublicRoute />}
         />
+
         <Route
           path="/dashboard"
-          element={token ? <Dashboard /> : <Navigate to="/" />}
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
         />
       </Routes>
     </BrowserRouter>

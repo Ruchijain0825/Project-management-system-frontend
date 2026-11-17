@@ -1,688 +1,604 @@
 
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import {
+  Zap,
+  LayoutDashboard,
+  CalendarDays,
   FolderKanban,
-  Ticket,
-  Clock,
-  CheckCircle,
-  Plus,
   Users,
-  AlertCircle,
+  Settings,
+  Search,
+  Bell,
+  Plus,
+  CheckCircle2,
+  TrendingUp,
+  Ticket,
+  LogOut,
+  MoreHorizontal,
+  Clock3,
+  ChevronDown,
+  Menu,
+  X,
 } from "lucide-react";
-import { Sparkles } from "lucide-react";
-import AITicketGenerator from "../components/AITicketGenerator";
-import { Sparkles } from "lucide-react";
-import Sidebar from "../components/Sidebar";
-import Header from "../components/Header";
-import StatCard from "../components/StatCard";
-import TicketCard from "../components/TicketCard";
-import CreateTicketModal from "../components/CreateTicketModal";
-import KanbanBoard from "../components/KanbanBoard";
-import TicketDetailsModal from "../components/TicketDetailsModal";
-import EditTicketModal from "../components/EditTicketModal";
 
-import api from "../services/api";
-
-const Dashboard = () => {
-  const navigate = useNavigate();
-
-  // Navigation
-  const [active, setActive] = useState("Overview");
-
-  // Project states
-  const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState("");
-
-  // Ticket states
-  const [tickets, setTickets] = useState([]);
-
-  // UI states
-  const [loading, setLoading] = useState(true);
-  const [ticketLoading, setTicketLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // Modal states
-  const [showModal, setShowModal] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [editingTicket, setEditingTicket] = useState(null);
-  const [showAIModal, setShowAIModal] = useState(false);
-  // Fetch projects
-  const fetchProjects = useCallback(async () => {
-    try {
-      setError("");
-
-      const response = await api.get("/projects");
-
-      const projectList = response.data.projects || [];
-
-      setProjects(projectList);
-
-      if (projectList.length > 0) {
-        setSelectedProject((previous) => {
-          const exists = projectList.some(
-            (project) => project._id === previous
-          );
-
-          return exists ? previous : projectList[0]._id;
-        });
-      } else {
-        setSelectedProject("");
-        setTickets([]);
-      }
-    } catch (error) {
-      console.error("Fetch projects error:", error);
-
-      setError(
-        error.response?.data?.message ||
-        "Failed to fetch projects"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Fetch tickets
-  const fetchTickets = useCallback(async () => {
-    if (!selectedProject) {
-      setTickets([]);
-      return;
-    }
-
-    try {
-      setTicketLoading(true);
-      setError("");
-
-      const response = await api.get(
-        `/tickets/project/${selectedProject}`
-      );
-
-      setTickets(response.data.tickets || []);
-    } catch (error) {
-      console.error("Fetch tickets error:", error);
-
-      setError(
-        error.response?.data?.message ||
-        "Failed to fetch tickets"
-      );
-    } finally {
-      setTicketLoading(false);
-    }
-  }, [selectedProject]);
-
-  // Initial projects load
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
-
-  // Project change -> fetch tickets
-  useEffect(() => {
-    fetchTickets();
-  }, [fetchTickets]);
-
-  // Refresh after ticket creation
-  const handleTicketCreated = async () => {
-    await fetchTickets();
-    setShowModal(false);
-  };
-
-  // Open ticket details
-  const handleTicketClick = (ticket) => {
-    setSelectedTicket(ticket);
-  };
-
-  // Open edit modal
-  const handleEditTicket = (ticket) => {
-    setSelectedTicket(null);
-    setEditingTicket(ticket);
-  };
-
-  // After update
-  const handleTicketUpdated = async () => {
-    await fetchTickets();
-
-    setEditingTicket(null);
-    setSelectedTicket(null);
-  };
-
-  // Delete ticket
-  const handleDeleteTicket = async (ticketId) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this ticket?"
-    );
-
-    if (!confirmed) return;
-
-    try {
-      await api.delete(`/tickets/${ticketId}`);
-
-      setTickets((previous) =>
-        previous.filter(
-          (ticket) => ticket._id !== ticketId
-        )
-      );
-
-      setSelectedTicket(null);
-      setEditingTicket(null);
-    } catch (error) {
-      console.error("Delete ticket error:", error);
-
-      alert(
-        error.response?.data?.message ||
-        "Failed to delete ticket"
-      );
-    }
-  };
-
-  // Logout
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-
-    navigate("/");
-  };
-
-  // Dashboard statistics
-  const totalTickets = tickets.length;
-
-  const todoTickets = tickets.filter(
-    (ticket) => ticket.status === "To Do"
-  ).length;
-
-  const inProgressTickets = tickets.filter(
-    (ticket) => ticket.status === "In Progress"
-  ).length;
-
-  const completedTickets = tickets.filter(
-    (ticket) => ticket.status === "Done"
-  ).length;
-
-  const highPriorityTickets = tickets.filter(
-    (ticket) =>
-      ticket.priority === "High" ||
-      ticket.priority === "Critical"
-  ).length;
-
-  // Loading screen
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-
-          <p className="text-gray-400">
-            Loading dashboard...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col md:flex-row">
-
-      {/* SIDEBAR */}
-      <Sidebar
-        active={active}
-        setActive={setActive}
-        onLogout={handleLogout}
-      />
-
-      {/* MAIN CONTENT */}
-      <main className="flex-1 min-w-0">
-
-        {/* HEADER */}
-        <Header
-          projects={projects}
-          selectedProject={selectedProject}
-          setSelectedProject={setSelectedProject}
-          onCreateTicket={() => setShowModal(true)}
-        />
-
-        <div className="p-4 md:p-6 lg:p-8">
-
-          {/* ERROR MESSAGE */}
-          {error && (
-            <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-              <AlertCircle size={18} />
-              {error}
-            </div>
-          )}
-
-          {/* NO PROJECTS */}
-          {projects.length === 0 ? (
-            <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
-
-              <FolderKanban
-                size={55}
-                className="text-yellow-400 mb-4"
-              />
-
-              <h2 className="text-2xl font-semibold mb-2">
-                No projects yet
-              </h2>
-
-              <p className="text-gray-400 mb-5">
-                Create your first project to start managing tickets.
-              </p>
-
-              <button
-                onClick={() => setActive("Projects")}
-                className="bg-yellow-400 text-black px-5 py-2.5 rounded-lg font-semibold hover:bg-yellow-300"
-              >
-                Go to Projects
-              </button>
-
-            </div>
-          ) : (
-            <>
-
-              {/* OVERVIEW */}
-              {active === "Overview" && (
-                <div className="space-y-7">
-
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-bold">
-                      Dashboard Overview
-                    </h1>
-
-                    <p className="text-gray-400 mt-2">
-                      Track your project progress and team activity.
-                    </p>
-                  </div>
-
-                  {/* STATISTICS */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
-                    <StatCard
-                      title="Total Tickets"
-                      value={totalTickets}
-                      icon={<Ticket size={22} />}
-                    />
-
-                    <StatCard
-                      title="To Do"
-                      value={todoTickets}
-                      icon={<Clock size={22} />}
-                    />
-
-                    <StatCard
-                      title="In Progress"
-                      value={inProgressTickets}
-                      icon={<FolderKanban size={22} />}
-                    />
-
-                    <StatCard
-                      title="Completed"
-                      value={completedTickets}
-                      icon={<CheckCircle size={22} />}
-                    />
-
-                  </div>
-
-                  {/* HIGH PRIORITY */}
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-
-                    <div className="flex items-center justify-between">
-
-                      <div>
-                        <p className="text-gray-400 text-sm">
-                          High / Critical Priority
-                        </p>
-
-                        <h2 className="text-3xl font-bold mt-2">
-                          {highPriorityTickets}
-                        </h2>
-                      </div>
-
-                      <AlertCircle
-                        size={30}
-                        className="text-red-400"
-                      />
-
-                    </div>
-
-                  </div>
-
-                  {/* RECENT TICKETS */}
-                  <section>
-
-                    <div className="flex items-center justify-between mb-4">
-
-                      <h2 className="text-xl font-semibold">
-                        Recent Tickets
-                      </h2>
-
-                      <button
-                        onClick={() => setActive("Tickets")}
-                        className="text-yellow-400 text-sm hover:underline"
-                      >
-                        View all
-                      </button>
-
-                    </div>
-
-                    {ticketLoading ? (
-                      <p className="text-gray-400">
-                        Loading tickets...
-                      </p>
-                    ) : tickets.length === 0 ? (
-                      <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
-
-                        <Ticket
-                          size={35}
-                          className="mx-auto text-gray-500 mb-3"
-                        />
-
-                        <p className="text-gray-400">
-                          No tickets created yet.
-                        </p>
-
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-                        {[...tickets]
-                          .sort(
-                            (a, b) =>
-                              new Date(b.createdAt || 0) -
-                              new Date(a.createdAt || 0)
-                          )
-                          .slice(0, 4)
-                          .map((ticket) => (
-                            <TicketCard
-                              key={ticket._id}
-                              ticket={ticket}
-                              onClick={() =>
-                                handleTicketClick(ticket)
-                              }
-                            />
-                          ))}
-
-                      </div>
-                    )}
-
-                  </section>
-
-                  {/* QUICK ACTIONS */}
-                  <section className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-
-                    <h2 className="text-lg font-semibold mb-4">
-                      Quick Actions
-                    </h2>
-
-                    <button
-                      onClick={() => setShowModal(true)}
-                      className="flex items-center gap-2 bg-yellow-400 text-black px-4 py-2.5 rounded-lg font-semibold hover:bg-yellow-300"
-                    >
-                      <Plus size={18} />
-                      Create New Ticket
-                    </button>
-                    <button
-                        onClick={() => setShowAIModal(true)}
-                        className="flex items-center gap-2 mt-3 bg-purple-500 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-purple-400"
-                    >
-                    <Sparkles size={18} />
-                    Generate Ticket with AI
-                    </button>
-
-                  </section>
-
-                </div>
-              )}
-
-              {/* PROJECTS */}
-              {active === "Projects" && (
-                <section>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-
-                    <div>
-                      <h1 className="text-2xl font-bold">
-                        Projects
-                      </h1>
-
-                      <p className="text-gray-400 mt-1">
-                        Manage your projects.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() => navigate("/projects")}
-                      className="flex items-center gap-2 bg-yellow-400 text-black px-4 py-2 rounded-lg font-semibold"
-                    >
-                      <Plus size={18} />
-                      Manage Projects
-                    </button>
-
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-
-                    {projects.map((project) => (
-                      <div
-                        key={project._id}
-                        onClick={() =>
-                          setSelectedProject(project._id)
-                        }
-                        className={`bg-gray-900 border rounded-xl p-5 cursor-pointer transition ${
-                          selectedProject === project._id
-                            ? "border-yellow-400"
-                            : "border-gray-800 hover:border-gray-600"
-                        }`}
-                      >
-
-                        <div className="flex items-center justify-between mb-4">
-
-                          <FolderKanban
-                            size={25}
-                            className="text-yellow-400"
-                          />
-
-                          <span className="text-xs text-gray-400">
-                            {project.teamMembers?.length || 0} members
-                          </span>
-
-                        </div>
-
-                        <h3 className="font-semibold text-lg">
-                          {project.title}
-                        </h3>
-
-                        <p className="text-sm text-gray-400 mt-2 line-clamp-3">
-                          {project.description ||
-                            "No description available"}
-                        </p>
-
-                        <p className="text-xs text-yellow-400 mt-4">
-                          {selectedProject === project._id
-                            ? "Selected project"
-                            : "Click to select"}
-                        </p>
-
-                      </div>
-                    ))}
-
-                  </div>
-
-                </section>
-              )}
-
-              {/* TICKETS - SEARCH FILTER SORT KANBAN */}
-              {active === "Tickets" && (
-                <section>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-
-                    <div>
-                      <h1 className="text-2xl font-bold">
-                        Ticket Board
-                      </h1>
-
-                      <p className="text-gray-400 mt-1">
-                        Search, filter, sort and manage your tickets.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() => setShowModal(true)}
-                      className="flex items-center gap-2 bg-yellow-400 text-black px-4 py-2 rounded-lg font-semibold hover:bg-yellow-300"
-                    >
-                      <Plus size={18} />
-                      Create Ticket
-                    </button>
-
-                  </div>
-
-                  {ticketLoading ? (
-                    <div className="text-gray-400 py-8">
-                      Loading tickets...
-                    </div>
-                  ) : (
-                    <KanbanBoard
-                      tickets={tickets}
-                      setTickets={setTickets}
-                      onTicketClick={handleTicketClick}
-                    />
-                  )}
-
-                </section>
-              )}
-
-              {/* TEAM */}
-              {active === "Team" && (
-                <section>
-
-                  <div className="mb-6">
-                    <h1 className="text-2xl font-bold">
-                      Team Members
-                    </h1>
-
-                    <p className="text-gray-400 mt-1">
-                      People working on this project.
-                    </p>
-                  </div>
-
-                  {(() => {
-                    const currentProject = projects.find(
-                      (project) =>
-                        project._id === selectedProject
-                    );
-
-                    const members = currentProject
-                      ? [
-                          ...(currentProject.owner
-                            ? [currentProject.owner]
-                            : []),
-                          ...(currentProject.teamMembers || []),
-                        ]
-                      : [];
-
-                    const uniqueMembers = [
-                      ...new Map(
-                        members
-                          .filter(Boolean)
-                          .map((member) => [
-                            member._id,
-                            member,
-                          ])
-                      ).values(),
-                    ];
-
-                    return uniqueMembers.length === 0 ? (
-                      <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
-
-                        <Users
-                          size={35}
-                          className="mx-auto text-gray-500 mb-3"
-                        />
-
-                        <p className="text-gray-400">
-                          No team members found.
-                        </p>
-
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-
-                        {uniqueMembers.map((member) => (
-                          <div
-                            key={member._id}
-                            className="bg-gray-900 border border-gray-800 rounded-xl p-5"
-                          >
-
-                            <div className="w-12 h-12 rounded-full bg-yellow-400 text-black flex items-center justify-center font-bold text-lg mb-3">
-                              {member.name
-                                ?.charAt(0)
-                                .toUpperCase() || "U"}
-                            </div>
-
-                            <h3 className="font-semibold">
-                              {member.name || "Unknown User"}
-                            </h3>
-
-                            <p className="text-sm text-gray-400 mt-1">
-                              {member.email}
-                            </p>
-
-                            <span className="inline-block mt-3 text-xs bg-gray-800 px-3 py-1 rounded-full text-yellow-400 capitalize">
-                              {member.role || "Developer"}
-                            </span>
-
-                          </div>
-                        ))}
-
-                      </div>
-                    );
-                  })()}
-
-                </section>
-              )}
-
-            </>
-          )}
-
-        </div>
-      </main>
-
-      {/* CREATE TICKET MODAL */}
-      {showModal && (
-        <CreateTicketModal
-          projectId={selectedProject}
-          onClose={() => setShowModal(false)}
-          onCreated={handleTicketCreated}
-        />
-      )}
-
-      {/* TICKET DETAILS MODAL */}
-      {selectedTicket && (
-        <TicketDetailsModal
-          ticket={selectedTicket}
-          onClose={() => setSelectedTicket(null)}
-          onEdit={handleEditTicket}
-          onDelete={handleDeleteTicket}
-        />
-      )}
-
-      {/* EDIT TICKET MODAL */}
-      {editingTicket && (
-        <EditTicketModal
-          ticket={editingTicket}
-          onClose={() => setEditingTicket(null)}
-          onUpdated={handleTicketUpdated}
-        />
-      )}
-
-      {showAIModal && (
-       <AITicketGenerator
-       projectId={selectedProject}
-       onClose={() => setShowAIModal(false)}
-       onCreated={fetchTickets}
-  />
-)}
-
-    </div>
-  );
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
+
+const navigation = [
+  { name: "Overview", icon: LayoutDashboard },
+  { name: "Calendar", icon: CalendarDays },
+  { name: "Projects", icon: FolderKanban },
+  { name: "Tickets", icon: Ticket },
+  { name: "Team", icon: Users },
+  { name: "Settings", icon: Settings },
+];
+
+const stats = [
+  {
+    title: "Total Projects",
+    value: "48",
+    change: "+12.5%",
+    icon: FolderKanban,
+    color: "text-blue-400",
+    bg: "bg-blue-500/10",
+  },
+  {
+    title: "Completed Tasks",
+    value: "189",
+    change: "+18.2%",
+    icon: CheckCircle2,
+    color: "text-purple-400",
+    bg: "bg-purple-500/10",
+  },
+  {
+    title: "Team Utilization",
+    value: "85%",
+    change: "+8.4%",
+    icon: Users,
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+  },
+];
+
+const chartData = [
+  { month: "Jan", current: 320, previous: 280 },
+  { month: "Feb", current: 450, previous: 380 },
+  { month: "Mar", current: 390, previous: 520 },
+  { month: "Apr", current: 550, previous: 420 },
+  { month: "May", current: 430, previous: 580 },
+  { month: "Jun", current: 620, previous: 490 },
+  { month: "Jul", current: 500, previous: 650 },
+  { month: "Aug", current: 700, previous: 570 },
+  { month: "Sep", current: 590, previous: 730 },
+  { month: "Oct", current: 760, previous: 650 },
+  { month: "Nov", current: 680, previous: 790 },
+  { month: "Dec", current: 850, previous: 720 },
+];
+
+const projects = [
+  {
+    id: 1,
+    name: "TaskFlow Web App",
+    category: "Website Development",
+    status: "On Track",
+    deadline: "25 Nov 2026",
+    progress: 85,
+    color: "bg-cyan-400",
+  },
+  {
+    id: 2,
+    name: "AI Integration",
+    category: "Backend Development",
+    status: "At Risk",
+    deadline: "28 Nov 2026",
+    progress: 55,
+    color: "bg-purple-500",
+  },
+  {
+    id: 3,
+    name: "Marketing Campaign",
+    category: "Marketing",
+    status: "Off Track",
+    deadline: "05 Dec 2026",
+    progress: 30,
+    color: "bg-blue-500",
+  },
+  {
+    id: 4,
+    name: "Mobile Application",
+    category: "App Development",
+    status: "On Track",
+    deadline: "15 Dec 2026",
+    progress: 70,
+    color: "bg-cyan-400",
+  },
+];
+
+const activities = [
+  {
+    title: "Task UI Redesign",
+    description: "Project task completed",
+    time: "2 hours ago",
+    icon: CheckCircle2,
+    color: "text-emerald-400",
+    bg: "bg-emerald-400/10",
+  },
+  {
+    title: "API Integration",
+    description: "New comment added",
+    time: "4 hours ago",
+    icon: Ticket,
+    color: "text-purple-400",
+    bg: "bg-purple-400/10",
+  },
+  {
+    title: "Mobile App",
+    description: "Project created",
+    time: "Yesterday",
+    icon: FolderKanban,
+    color: "text-blue-400",
+    bg: "bg-blue-400/10",
+  },
+  {
+    title: "Team Update",
+    description: "New member joined",
+    time: "Yesterday",
+    icon: Users,
+    color: "text-yellow-400",
+    bg: "bg-yellow-400/10",
+  },
+];
+
+const statusStyles = {
+  "On Track": "bg-emerald-400/10 text-emerald-400 border-emerald-400/20",
+  "At Risk": "bg-yellow-400/10 text-yellow-400 border-yellow-400/20",
+  "Off Track": "bg-red-400/10 text-red-400 border-red-400/20",
 };
 
-export default Dashboard;
+function Sidebar({ activeNav, setActiveNav, mobile = false, onClose }) {
+  return (
+    <aside
+      className={`flex h-full w-[250px] shrink-0 flex-col border-r border-slate-800 bg-[#070E24] ${
+        mobile ? "min-h-screen" : "sticky top-0 h-screen"
+      }`}
+    >
+      <div className="flex h-[76px] shrink-0 items-center justify-between border-b border-slate-800 px-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-400 text-black">
+            <Zap size={22} />
+          </div>
+          <span className="text-2xl font-extrabold tracking-tight text-white">
+            Task<span className="text-yellow-400">Flow</span>
+          </span>
+        </div>
+
+        {mobile && (
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800"
+            aria-label="Close menu"
+          >
+            <X size={20} />
+          </button>
+        )}
+      </div>
+
+      <div className="px-4 pt-8">
+        <p className="mb-4 px-3 text-[10px] font-bold tracking-[2px] text-slate-500">
+          WORKSPACE
+        </p>
+
+        <nav className="space-y-2">
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            const active = activeNav === item.name;
+
+            return (
+              <button
+                key={item.name}
+                onClick={() => {
+                  setActiveNav(item.name);
+                  onClose?.();
+                }}
+                className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm transition-colors ${
+                  active
+                    ? "border-l-[3px] border-blue-400 bg-[#182747] font-semibold text-blue-400"
+                    : "border-l-[3px] border-transparent text-slate-400 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <Icon size={19} />
+                <span>{item.name}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="mt-auto border-t border-slate-800 p-4">
+        <div className="flex items-center gap-3 px-1 py-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 font-bold text-white">
+            U
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">
+              Username
+            </p>
+            <p className="text-xs text-slate-500">Administrator</p>
+          </div>
+          <MoreHorizontal size={19} className="text-slate-500" />
+        </div>
+
+        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm text-red-400 hover:bg-red-400/10">
+          <LogOut size={18} />
+          Logout
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+export default function Dashboard() {
+  const [activeNav, setActiveNav] = useState("Overview");
+  const [search, setSearch] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const filteredProjects = projects.filter((project) =>
+    project.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#080D1C] font-sans text-white">
+      <div className="flex min-h-screen w-full">
+        {/* Desktop Sidebar */}
+        <div className="hidden w-[250px] shrink-0 lg:block">
+          <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} />
+        </div>
+
+        {/* Mobile Sidebar */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              className="absolute inset-0 bg-black/70"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close navigation"
+            />
+            <div className="relative z-10 h-full w-[250px] max-w-[85vw]">
+              <Sidebar
+                activeNav={activeNav}
+                setActiveNav={setActiveNav}
+                mobile
+                onClose={() => setMobileMenuOpen(false)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Main Content */}
+        <main className="min-w-0 flex-1">
+          {/* Header */}
+          <header className="sticky top-0 z-20 flex min-h-[76px] flex-col justify-between gap-4 border-b border-slate-800 bg-[#0B1223]/95 px-4 py-4 backdrop-blur-xl sm:flex-row sm:items-center sm:px-6 lg:px-8">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:bg-slate-800 lg:hidden"
+                aria-label="Open navigation"
+              >
+                <Menu size={20} />
+              </button>
+
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+                  Welcome Back, User!
+                </h1>
+                <p className="mt-1 text-xs text-slate-400 sm:text-sm">
+                  Here's a quick overview of your work status.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative min-w-0 flex-1 sm:flex-none">
+                <Search
+                  size={17}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Type to search..."
+                  className="h-10 w-full rounded-lg border border-slate-700 bg-[#131E37] pl-10 pr-3 text-xs text-white outline-none placeholder:text-slate-500 focus:border-blue-400 sm:w-52"
+                />
+              </div>
+
+              <button className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800">
+                <Bell size={19} />
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-yellow-400" />
+              </button>
+
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-purple-400 bg-gradient-to-br from-blue-500 to-purple-600 text-sm font-bold">
+                U
+              </div>
+
+              <button className="hidden shrink-0 items-center gap-2 rounded-lg bg-yellow-400 px-4 py-3 text-xs font-bold text-black transition-colors hover:bg-yellow-300 xl:flex">
+                <Plus size={17} />
+                Create Ticket
+              </button>
+            </div>
+          </header>
+
+          <div className="mx-auto w-full max-w-[1600px] space-y-6 p-4 sm:p-6 lg:p-7">
+            {/* Stats */}
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {stats.map((stat) => {
+                const Icon = stat.icon;
+
+                return (
+                  <div
+                    key={stat.title}
+                    className="relative min-w-0 overflow-hidden rounded-xl border border-slate-700/70 bg-gradient-to-br from-[#142343] to-[#10172D] p-5 transition hover:-translate-y-1 hover:border-blue-400/40"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.bg} ${stat.color}`}
+                      >
+                        <Icon size={21} />
+                      </div>
+                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-400">
+                        <TrendingUp size={14} />
+                        {stat.change}
+                      </span>
+                    </div>
+                    <p className="mt-5 text-xs text-slate-400">{stat.title}</p>
+                    <h2 className="mt-1 text-3xl font-bold text-white">
+                      {stat.value}
+                    </h2>
+                    <p className="mt-2 text-[10px] text-slate-500">
+                      Compared to last month
+                    </p>
+                  </div>
+                );
+              })}
+            </section>
+
+            {/* Chart and Activity */}
+            <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.8fr)_minmax(270px,1fr)]">
+              <div className="min-w-0 rounded-xl border border-slate-800 bg-[#101A32] p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-white">
+                      Project Progress Overview
+                    </h3>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Monthly performance analytics
+                    </p>
+                  </div>
+                  <button className="flex items-center gap-2 rounded-lg border border-slate-700 bg-[#0B1428] px-3 py-2 text-[10px] text-slate-400">
+                    <CalendarDays size={14} />
+                    This Year
+                    <ChevronDown size={13} />
+                  </button>
+                </div>
+
+                <div className="mt-5 mb-2 flex justify-end gap-4 text-[10px] text-slate-400">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-blue-500" />
+                    Last Month
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-purple-500" />
+                    This Month
+                  </span>
+                </div>
+
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={chartData}
+                      margin={{ top: 10, right: 8, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        stroke="#25334D"
+                        strokeDasharray="4 5"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="month"
+                        tick={{ fill: "#8291AC", fontSize: 10 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fill: "#8291AC", fontSize: 10 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: "#111B30",
+                          border: "1px solid #354266",
+                          borderRadius: "10px",
+                          color: "#fff",
+                          fontSize: "12px",
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="previous"
+                        name="Last Month"
+                        stroke="#168DFF"
+                        strokeWidth={2.5}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="current"
+                        name="This Month"
+                        stroke="#C044FF"
+                        strokeWidth={2.5}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="min-w-0 rounded-xl border border-slate-800 bg-[#101A32] p-5">
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Recent Activity
+                  </h3>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Latest workspace updates
+                  </p>
+                </div>
+
+                <div className="mt-5 space-y-5">
+                  {activities.map((activity) => {
+                    const Icon = activity.icon;
+
+                    return (
+                      <div className="flex gap-3" key={activity.title}>
+                        <div
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${activity.bg} ${activity.color}`}
+                        >
+                          <Icon size={17} />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-semibold text-slate-200">
+                            {activity.title}
+                          </h4>
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            {activity.description}
+                          </p>
+                          <span className="mt-2 flex items-center gap-1 text-[9px] text-slate-500">
+                            <Clock3 size={11} />
+                            {activity.time}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button className="mt-6 w-full border-t border-slate-800 pt-4 text-xs font-medium text-blue-400 hover:text-blue-300">
+                  View all activity →
+                </button>
+              </div>
+            </section>
+
+            {/* Projects Table */}
+            <section className="overflow-hidden rounded-xl border border-slate-800 bg-[#101A32]">
+              <div className="flex items-center justify-between gap-3 p-5">
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Project Progress
+                  </h3>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Monitor all your active projects
+                  </p>
+                </div>
+                <button className="whitespace-nowrap text-[10px] font-semibold text-blue-400 hover:text-blue-300">
+                  View All Projects →
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] text-left">
+                  <thead className="border-y border-slate-800 bg-[#0B1428]">
+                    <tr className="text-[10px] uppercase tracking-wider text-slate-500">
+                      <th className="px-5 py-4 font-semibold">Project</th>
+                      <th className="px-5 py-4 font-semibold">Status</th>
+                      <th className="px-5 py-4 font-semibold">Deadline</th>
+                      <th className="px-5 py-4 font-semibold">Progress</th>
+                      <th className="px-5 py-4 font-semibold">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-800/80">
+                    {filteredProjects.map((project) => (
+                      <tr
+                        key={project.id}
+                        className="transition-colors hover:bg-[#172440]"
+                      >
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                              <FolderKanban size={17} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-slate-200">
+                                {project.name}
+                              </p>
+                              <p className="mt-1 text-[10px] text-slate-500">
+                                {project.category}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[9px] font-semibold ${statusStyles[project.status]}`}
+                          >
+                            {project.status}
+                          </span>
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-4 text-[11px] text-slate-400">
+                          {project.deadline}
+                        </td>
+
+                        <td className="min-w-[170px] px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-700">
+                              <div
+                                className={`h-full rounded-full ${project.color}`}
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+                            <span className="w-8 text-[10px] text-slate-400">
+                              {project.progress}%
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <button className="text-slate-500 hover:text-white">
+                            <MoreHorizontal size={19} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {filteredProjects.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan="5"
+                          className="py-10 text-center text-sm text-slate-500"
+                        >
+                          No projects found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <footer className="flex flex-col justify-between gap-2 pb-3 text-[10px] text-slate-600 sm:flex-row">
+              <span>© 2026 TaskFlow. All rights reserved.</span>
+              <span>Manage your work. Stay productive.</span>
+            </footer>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
