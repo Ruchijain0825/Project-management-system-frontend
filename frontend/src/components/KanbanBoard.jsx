@@ -2,14 +2,17 @@
 import { useMemo, useState } from "react";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { Search, RotateCcw } from "lucide-react";
-
-import KanbanColumn from "../components/KanbanColoumn";
+import { Droppable, Draggable } from "@hello-pangea/dnd";
+import KanbanColumn from "./KanbanColoumn";
 import api from "../services/api";
 
 const STATUSES = ["To Do", "In Progress", "Done"];
 
+const getTicketId = (ticket) =>
+  String(ticket?._id || ticket?.id || "");
+
 const KanbanBoard = ({
-  tickets,
+  tickets = [],
   setTickets,
   onTicketClick,
 }) => {
@@ -18,77 +21,71 @@ const KanbanBoard = ({
   const [status, setStatus] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
 
-  // Search + Filter + Sort
-  const filteredTickets = useMemo(() => {
-    let result = [...tickets];
+  const safeTickets = Array.isArray(tickets) ? tickets : [];
 
-    // Search by title and description
+  const filteredTickets = useMemo(() => {
+    let result = safeTickets.filter(
+      (ticket) => ticket && getTicketId(ticket)
+    );
+
     if (search.trim()) {
       const query = search.toLowerCase().trim();
 
-      result = result.filter((ticket) => {
-        return (
-          ticket.title?.toLowerCase().includes(query) ||
-          ticket.description?.toLowerCase().includes(query)
-        );
-      });
+      result = result.filter((ticket) =>
+        String(ticket.title || "").toLowerCase().includes(query) ||
+        String(ticket.description || "").toLowerCase().includes(query)
+      );
     }
 
-    // Priority filter
     if (priority !== "All") {
       result = result.filter(
         (ticket) => ticket.priority === priority
       );
     }
 
-    // Status filter
     if (status !== "All") {
       result = result.filter(
         (ticket) => ticket.status === status
       );
     }
 
-    // Sorting
+    result = [...result];
+
     result.sort((a, b) => {
       if (sortBy === "newest") {
-        return (
-          new Date(b.createdAt || 0) -
-          new Date(a.createdAt || 0)
-        );
+        return new Date(b.createdAt || 0) -
+          new Date(a.createdAt || 0);
       }
 
       if (sortBy === "oldest") {
-        return (
-          new Date(a.createdAt || 0) -
-          new Date(b.createdAt || 0)
-        );
+        return new Date(a.createdAt || 0) -
+          new Date(b.createdAt || 0);
       }
 
       if (sortBy === "title") {
-        return (a.title || "").localeCompare(b.title || "");
+        return String(a.title || "").localeCompare(
+          String(b.title || "")
+        );
       }
 
       if (sortBy === "priority") {
-        const priorityOrder = {
+        const order = {
           Critical: 4,
           High: 3,
           Medium: 2,
           Low: 1,
         };
 
-        return (
-          (priorityOrder[b.priority] || 0) -
-          (priorityOrder[a.priority] || 0)
-        );
+        return (order[b.priority] || 0) -
+          (order[a.priority] || 0);
       }
 
       return 0;
     });
 
     return result;
-  }, [tickets, search, priority, status, sortBy]);
+  }, [safeTickets, search, priority, status, sortBy]);
 
-  // Reset all filters
   const resetFilters = () => {
     setSearch("");
     setPriority("All");
@@ -96,11 +93,10 @@ const KanbanBoard = ({
     setSortBy("newest");
   };
 
-  // Drag and Drop
   const handleDragEnd = async (result) => {
     const { source, destination, draggableId } = result;
 
-    if (!destination) return;
+    if (!destination || !setTickets) return;
 
     if (
       source.droppableId === destination.droppableId &&
@@ -109,52 +105,48 @@ const KanbanBoard = ({
       return;
     }
 
-    const ticket = tickets.find(
-      (item) => item._id === draggableId
+    const ticket = safeTickets.find(
+      (item) => getTicketId(item) === draggableId
     );
 
     if (!ticket) return;
 
-    const previousTickets = [...tickets];
     const newStatus = destination.droppableId;
 
-    // Optimistic status update
-    const updatedTickets = tickets.map((item) =>
-      item._id === draggableId
+    if (!STATUSES.includes(newStatus)) return;
+    if (ticket.status === newStatus) return;
+
+    const previousTickets = [...safeTickets];
+
+    const updatedTickets = safeTickets.map((item) =>
+      getTicketId(item) === draggableId
         ? { ...item, status: newStatus }
         : item
     );
 
     setTickets(updatedTickets);
 
-    // Persist changed status
-    if (ticket.status !== newStatus) {
-      try {
-        await api.put(`/tickets/${draggableId}`, {
-          status: newStatus,
-        });
-      } catch (error) {
-        console.error("Status update failed:", error);
+    try {
+      await api.put(`/tickets/${draggableId}`, {
+        status: newStatus,
+      });
+    } catch (error) {
+      console.error("Ticket status update failed:", error);
+      setTickets(previousTickets);
 
-        setTickets(previousTickets);
-
-        alert(
-          error.response?.data?.message ||
-          "Could not update ticket status"
-        );
-      }
+      alert(
+        error.response?.data?.message ||
+        "Could not update ticket status"
+      );
     }
   };
 
   return (
     <div className="space-y-5">
 
-      {/* Search and Filters */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row">
 
-        <div className="flex flex-col lg:flex-row gap-3">
-
-          {/* Search */}
           <div className="relative flex-1">
             <Search
               size={18}
@@ -165,16 +157,15 @@ const KanbanBoard = ({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by title or description..."
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none focus:border-yellow-400"
+              placeholder="Search tickets..."
+              className="w-full rounded-lg border border-gray-700 bg-gray-800 py-2.5 pl-10 pr-4 text-white outline-none focus:border-yellow-400"
             />
           </div>
 
-          {/* Priority Filter */}
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white outline-none"
+            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-white"
           >
             <option value="All">All Priorities</option>
             <option value="Critical">Critical</option>
@@ -183,23 +174,23 @@ const KanbanBoard = ({
             <option value="Low">Low</option>
           </select>
 
-          {/* Status Filter */}
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white outline-none"
+            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-white"
           >
             <option value="All">All Statuses</option>
-            <option value="To Do">To Do</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Done">Done</option>
+            {STATUSES.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
           </select>
 
-          {/* Sort */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white outline-none"
+            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-white"
           >
             <option value="newest">Newest First</option>
             <option value="oldest">Oldest First</option>
@@ -207,55 +198,53 @@ const KanbanBoard = ({
             <option value="priority">Priority</option>
           </select>
 
-          {/* Reset */}
           <button
+            type="button"
             onClick={resetFilters}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300"
+            className="flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-gray-300 hover:bg-gray-700"
           >
             <RotateCcw size={16} />
             Reset
           </button>
-
         </div>
 
-        <p className="text-xs text-gray-400 mt-3">
-          Showing {filteredTickets.length} of {tickets.length} tickets
+        <p className="mt-3 text-xs text-gray-400">
+          Showing {filteredTickets.length} of {safeTickets.length} tickets
         </p>
       </div>
 
-      {/* Kanban Board */}
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
-
-          {STATUSES
-            .filter(
-              (columnStatus) =>
-                status === "All" || status === columnStatus
-            )
-            .map((columnStatus) => {
-              const columnTickets = filteredTickets.filter(
-                (ticket) => ticket.status === columnStatus
-              );
-
-              return (
-                <KanbanColumn
-                  key={columnStatus}
-                  status={columnStatus}
-                  tickets={columnTickets}
-                  onTicketClick={onTicketClick}
-                />
-              );
-            })}
-
+      {safeTickets.length === 0 ? (
+        <div className="rounded-xl border border-gray-800 bg-gray-900 py-12 text-center text-gray-400">
+          No tickets created yet. Click Create Ticket to get started.
         </div>
-      </DragDropContext>
+      ) : (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {STATUSES
+              .filter((item) => status === "All" || status === item)
+              .map((columnStatus) => {
+                const columnTickets = filteredTickets.filter(
+                  (ticket) => ticket.status === columnStatus
+                );
 
-      {filteredTickets.length === 0 && (
-        <div className="text-center py-8 text-gray-400">
-          No tickets match your search or filters.
-        </div>
+                return (
+                  <KanbanColumn
+                    key={columnStatus}
+                    status={columnStatus}
+                    tickets={columnTickets}
+                    onTicketClick={onTicketClick}
+                  />
+                );
+              })}
+          </div>
+        </DragDropContext>
       )}
 
+      {safeTickets.length > 0 && filteredTickets.length === 0 && (
+        <p className="py-4 text-center text-gray-400">
+          No tickets match your search or filters.
+        </p>
+      )}
     </div>
   );
 };

@@ -4,9 +4,11 @@ import TicketCard from "./TicketCard";
 
 const KanbanColumn = ({
   status,
-  tickets,
+  tickets = [],
   onTicketClick,
 }) => {
+  const safeTickets = Array.isArray(tickets) ? tickets : [];
+
   const colors = {
     "To Do": "border-blue-500",
     "In Progress": "border-yellow-500",
@@ -20,10 +22,10 @@ const KanbanColumn = ({
       } rounded-xl p-4`}
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold">{status}</h3>
+        <h3 className="font-semibold text-white">{status}</h3>
 
         <span className="text-xs bg-gray-800 text-gray-300 px-2.5 py-1 rounded-full">
-          {tickets.length}
+          {safeTickets.length}
         </span>
       </div>
 
@@ -33,40 +35,42 @@ const KanbanColumn = ({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`min-h-[200px] space-y-3 rounded-lg transition ${
-              snapshot.isDraggingOver
-                ? "bg-gray-800"
-                : ""
+              snapshot.isDraggingOver ? "bg-gray-800" : ""
             }`}
           >
-            {tickets.map((ticket, index) => (
-              <Draggable
-                key={ticket._id}
-                draggableId={ticket._id}
-                index={index}
-              >
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                    className={
-                      snapshot.isDragging
-                        ? "opacity-80"
-                        : ""
-                    }
-                  >
-                    <TicketCard
-                      ticket={ticket}
-                      onClick={() => onTicketClick?.(ticket)}
-                    />
-                  </div>
-                )}
-              </Draggable>
-            ))}
+            {safeTickets.map((ticket, index) => {
+              const ticketId = String(ticket._id || ticket.id || "");
+
+              if (!ticketId) return null;
+
+              return (
+                <Draggable
+                  key={ticketId}
+                  draggableId={ticketId}
+                  index={index}
+                >
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      {...provided.dragHandleProps}
+                      className={
+                        snapshot.isDragging ? "opacity-80" : ""
+                      }
+                    >
+                      <TicketCard
+                        ticket={ticket}
+                        onClick={() => onTicketClick?.(ticket)}
+                      />
+                    </div>
+                  )}
+                </Draggable>
+              );
+            })}
 
             {provided.placeholder}
 
-            {tickets.length === 0 && (
+            {safeTickets.length === 0 && (
               <p className="text-sm text-gray-500 text-center py-8">
                 No tickets here
               </p>

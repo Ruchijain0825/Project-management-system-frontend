@@ -8,7 +8,7 @@ import {
 
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-
+console.log("NEW DASHBOARD LOADED");
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
 
