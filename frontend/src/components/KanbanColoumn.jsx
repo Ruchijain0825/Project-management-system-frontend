@@ -1,85 +1,131 @@
 
-import { Droppable, Draggable } from "@hello-pangea/dnd";
+import { useDroppable } from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { CheckCircle2, Circle, Clock3 } from "lucide-react";
 import TicketCard from "./TicketCard";
 
-const KanbanColumn = ({
-  status,
-  tickets = [],
-  onTicketClick,
-}) => {
-  const safeTickets = Array.isArray(tickets) ? tickets : [];
+const columnStyles = {
+  "To Do": {
+    icon: Circle,
+    color: "text-sky-400",
+    border: "border-sky-400/20",
+    background: "bg-sky-400/5",
+  },
+  "In Progress": {
+    icon: Clock3,
+    color: "text-indigo-400",
+    border: "border-indigo-400/20",
+    background: "bg-indigo-400/5",
+  },
+  Done: {
+    icon: CheckCircle2,
+    color: "text-emerald-400",
+    border: "border-emerald-400/20",
+    background: "bg-emerald-400/5",
+  },
+};
 
-  const colors = {
-    "To Do": "border-blue-500",
-    "In Progress": "border-yellow-500",
-    Done: "border-green-500",
+function SortableTicket({
+  ticket,
+  onTicketClick,
+  onEditTicket,
+  onDeleteTicket,
+}) {
+  const id = String(ticket._id || ticket.id);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
-    <div
-      className={`min-w-[300px] flex-1 bg-gray-900 border-t-4 ${
-        colors[status] || "border-gray-600"
-      } rounded-xl p-4`}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-white">{status}</h3>
+    <div ref={setNodeRef} style={style}>
+      <TicketCard
+        ticket={ticket}
+        onClick={() => onTicketClick?.(ticket)}
+        onEdit={() => onEditTicket?.(ticket)}
+        onDelete={() => onDeleteTicket?.(ticket)}
+        dragAttributes={attributes}
+        dragListeners={listeners}
+      />
+    </div>
+  );
+}
 
-        <span className="text-xs bg-gray-800 text-gray-300 px-2.5 py-1 rounded-full">
-          {safeTickets.length}
+function KanbanColumn({
+  status,
+  tickets = [],
+  onTicketClick,
+  onEditTicket,
+  onDeleteTicket,
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+  const style = columnStyles[status];
+  const Icon = style.icon;
+
+  return (
+    <section
+      ref={setNodeRef}
+      className={`min-h-[420px] rounded-2xl border p-4 transition ${
+        isOver
+          ? "border-indigo-400 bg-indigo-500/10"
+          : "border-slate-800 bg-slate-900/60"
+      }`}
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon size={18} className={style.color} />
+          <h3 className="font-semibold text-white">{status}</h3>
+        </div>
+
+        <span
+          className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${style.color} ${style.border} ${style.background}`}
+        >
+          {tickets.length}
         </span>
       </div>
 
-      <Droppable droppableId={status}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={`min-h-[200px] space-y-3 rounded-lg transition ${
-              snapshot.isDraggingOver ? "bg-gray-800" : ""
-            }`}
-          >
-            {safeTickets.map((ticket, index) => {
-              const ticketId = String(ticket._id || ticket.id || "");
-
-              if (!ticketId) return null;
-
-              return (
-                <Draggable
-                  key={ticketId}
-                  draggableId={ticketId}
-                  index={index}
-                >
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      className={
-                        snapshot.isDragging ? "opacity-80" : ""
-                      }
-                    >
-                      <TicketCard
-                        ticket={ticket}
-                        onClick={() => onTicketClick?.(ticket)}
-                      />
-                    </div>
-                  )}
-                </Draggable>
-              );
-            })}
-
-            {provided.placeholder}
-
-            {safeTickets.length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-8">
-                No tickets here
-              </p>
-            )}
-          </div>
+      <SortableContext
+        items={tickets.map((ticket) =>
+          String(ticket._id || ticket.id)
         )}
-      </Droppable>
-    </div>
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="min-h-[340px] space-y-3">
+          {tickets.map((ticket) => (
+            <SortableTicket
+              key={String(ticket._id || ticket.id)}
+              ticket={ticket}
+              onTicketClick={onTicketClick}
+              onEditTicket={onEditTicket}
+              onDeleteTicket={onDeleteTicket}
+            />
+          ))}
+
+          {tickets.length === 0 && (
+            <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-slate-700 text-sm text-slate-500">
+              Drop tickets here
+            </div>
+          )}
+        </div>
+      </SortableContext>
+    </section>
   );
-};
+}
 
 export default KanbanColumn;

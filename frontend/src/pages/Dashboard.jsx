@@ -19,16 +19,15 @@ import {
   AlertCircle,
   RefreshCw,
   ChevronDown,
-  Pencil,
-  Trash2,
-  CalendarDays,
 } from "lucide-react";
 
 import api from "../services/api";
+import KanbanBoard from "../components/KanbanBoard";
 import CreateTicketModal from "../components/CreateTicketModal";
 import CreateProjectModal from "../components/CreateProjectModal";
 import EditTicketModal from "../components/EditTicketModal";
 import TicketDetailsModal from "../components/TicketDetailsModal";
+import AIAnalyticsChatbot from "../components/AiAnalyticsChatbot";
 
 const navigation = [
   { name: "Overview", icon: LayoutDashboard },
@@ -38,7 +37,13 @@ const navigation = [
   { name: "Settings", icon: Settings },
 ];
 
-const STATUSES = ["To Do", "In Progress", "Done"];
+const getStoredUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null");
+  } catch {
+    return null;
+  }
+};
 
 const getId = (item) => item?._id || item?.id || "";
 
@@ -52,30 +57,6 @@ const extractList = (data, key) => {
   if (Array.isArray(data)) return data;
   return [];
 };
-
-const getErrorMessage = (err, fallback) =>
-  err?.response?.data?.message || err?.message || fallback;
-
-const priorityStyles = {
-  Low: "bg-slate-500/15 text-slate-300",
-  Medium: "bg-blue-500/15 text-blue-300",
-  High: "bg-orange-500/15 text-orange-300",
-  Critical: "bg-red-500/15 text-red-300",
-};
-
-const statusStyles = {
-  "To Do": "border-blue-500/30 bg-blue-500/10 text-blue-300",
-  "In Progress": "border-yellow-500/30 bg-yellow-500/10 text-yellow-300",
-  Done: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-};
-
-function getStoredUser() {
-  try {
-    return JSON.parse(localStorage.getItem("user") || "null");
-  } catch {
-    return null;
-  }
-}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -92,7 +73,6 @@ export default function Dashboard() {
 
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingTickets, setLoadingTickets] = useState(false);
-  const [updatingTicketId, setUpdatingTicketId] = useState("");
   const [error, setError] = useState("");
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -105,12 +85,7 @@ export default function Dashboard() {
 
   const initials = displayName.charAt(0).toUpperCase();
 
-  const selectedProject = projects.find(
-    (project) => String(getId(project)) === String(selectedProjectId)
-  );
-
-  // ---------------- FETCH PROJECTS ----------------
-
+  // Fetch projects
   const fetchProjects = useCallback(async () => {
     try {
       setLoadingProjects(true);
@@ -128,18 +103,21 @@ export default function Dashboard() {
 
         if (exists) return currentId;
 
-        return projectList.length ? String(getId(projectList[0])) : "";
+        return projectList.length
+          ? String(getId(projectList[0]))
+          : "";
       });
     } catch (err) {
       console.error("Fetch projects error:", err);
-      setError(getErrorMessage(err, "Unable to load projects."));
+      setError(
+        err.response?.data?.message || "Unable to load projects"
+      );
     } finally {
       setLoadingProjects(false);
     }
   }, []);
 
-  // ---------------- FETCH TICKETS ----------------
-
+  // Fetch tickets for selected project
   const fetchTickets = useCallback(async () => {
     if (!selectedProjectId) {
       setTickets([]);
@@ -155,10 +133,13 @@ export default function Dashboard() {
         `/tickets/project/${selectedProjectId}`
       );
 
-      setTickets(extractList(data, "tickets"));
+      const ticketList = extractList(data, "tickets");
+      setTickets(ticketList);
     } catch (err) {
       console.error("Fetch tickets error:", err);
-      setError(getErrorMessage(err, "Unable to load tickets."));
+      setError(
+        err.response?.data?.message || "Unable to load tickets"
+      );
       setTickets([]);
     } finally {
       setLoadingTickets(false);
@@ -173,32 +154,25 @@ export default function Dashboard() {
     fetchTickets();
   }, [fetchTickets]);
 
-  // ---------------- REFRESH ----------------
-
+  // Refresh project list after creating a project
   const refreshProjects = async () => {
     await fetchProjects();
     setActiveNav("Projects");
   };
 
+  // Refresh data after ticket operations
   const refreshTickets = async () => {
     await fetchTickets();
   };
 
-  const refreshAll = async () => {
-    await fetchProjects();
-    await fetchTickets();
-  };
-
-  // ---------------- LOGOUT ----------------
-
+  // Logout
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/", { replace: true });
   };
 
-  // ---------------- DELETE TICKET ----------------
-
+  // Delete ticket
   const handleDeleteTicket = async (ticketId) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this ticket?"
@@ -211,50 +185,20 @@ export default function Dashboard() {
 
       setTickets((previous) =>
         previous.filter(
-          (ticket) => String(getId(ticket)) !== String(ticketId)
+          (ticket) => String(ticket._id) !== String(ticketId)
         )
       );
 
       setSelectedTicket(null);
-      setEditingTicket(null);
     } catch (err) {
       console.error("Delete ticket error:", err);
-      window.alert(getErrorMessage(err, "Unable to delete ticket."));
-    }
-  };
-
-  // ---------------- UPDATE TICKET STATUS ----------------
-
-  const handleStatusChange = async (ticketId, newStatus) => {
-    const previousTickets = tickets;
-
-    setTickets((current) =>
-      current.map((ticket) =>
-        String(getId(ticket)) === String(ticketId)
-          ? { ...ticket, status: newStatus }
-          : ticket
-      )
-    );
-
-    try {
-      setUpdatingTicketId(String(ticketId));
-
-      await api.put(`/tickets/${ticketId}`, {
-        status: newStatus,
-      });
-    } catch (err) {
-      console.error("Update ticket status error:", err);
-      setTickets(previousTickets);
       window.alert(
-        getErrorMessage(err, "Unable to update ticket status.")
+        err.response?.data?.message || "Unable to delete ticket"
       );
-    } finally {
-      setUpdatingTicketId("");
     }
   };
 
-  // ---------------- SEARCH ----------------
-
+  // Search projects
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -265,26 +209,12 @@ export default function Dashboard() {
     );
   }, [projects, search]);
 
-  const filteredTickets = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  const selectedProject = projects.find(
+    (project) =>
+      String(getId(project)) === String(selectedProjectId)
+  );
 
-    if (!query) return tickets;
-
-    return tickets.filter((ticket) => {
-      const title = (ticket.title || "").toLowerCase();
-      const description = (ticket.description || "").toLowerCase();
-      const type = (ticket.type || "").toLowerCase();
-
-      return (
-        title.includes(query) ||
-        description.includes(query) ||
-        type.includes(query)
-      );
-    });
-  }, [tickets, search]);
-
-  // ---------------- STATISTICS ----------------
-
+  // Real ticket statistics
   const totalTickets = tickets.length;
 
   const todoTickets = tickets.filter(
@@ -334,8 +264,7 @@ export default function Dashboard() {
     },
   ];
 
-  // ---------------- SIDEBAR ----------------
-
+  // Sidebar
   const Sidebar = ({ mobile = false }) => (
     <aside
       className={`flex h-full w-[250px] shrink-0 flex-col border-r border-slate-800 bg-[#070E24] ${
@@ -422,158 +351,16 @@ export default function Dashboard() {
     </aside>
   );
 
-  // ---------------- TICKET CARD ----------------
-
-  const TicketCard = ({ ticket }) => {
-    const ticketId = getId(ticket);
-
-    return (
-      <article className="rounded-xl border border-slate-700 bg-[#0B1428] p-4 transition hover:border-blue-400/50">
-        <div className="flex items-start justify-between gap-2">
-          <button
-            onClick={() => setSelectedTicket(ticket)}
-            className="min-w-0 flex-1 text-left"
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              {ticket.type || "Task"}
-            </p>
-
-            <h4 className="mt-2 break-words text-sm font-semibold text-white hover:text-blue-300">
-              {ticket.title || "Untitled ticket"}
-            </h4>
-          </button>
-
-          <span
-            className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold ${
-              priorityStyles[ticket.priority] || priorityStyles.Medium
-            }`}
-          >
-            {ticket.priority || "Medium"}
-          </span>
-        </div>
-
-        <p className="mt-3 line-clamp-2 min-h-9 text-xs leading-5 text-slate-400">
-          {ticket.description || "No description provided."}
-        </p>
-
-        <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-800 pt-3">
-          <div className="flex items-center gap-2 text-[10px] text-slate-500">
-            <CalendarDays size={13} />
-            {ticket.createdAt
-              ? new Date(ticket.createdAt).toLocaleDateString()
-              : "No date"}
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              title="View ticket"
-              onClick={() => setSelectedTicket(ticket)}
-              className="rounded-md p-2 text-slate-400 hover:bg-slate-700 hover:text-white"
-            >
-              <Search size={14} />
-            </button>
-
-            <button
-              title="Edit ticket"
-              onClick={() => setEditingTicket(ticket)}
-              className="rounded-md p-2 text-blue-400 hover:bg-blue-500/10"
-            >
-              <Pencil size={14} />
-            </button>
-
-            <button
-              title="Delete ticket"
-              onClick={() => handleDeleteTicket(ticketId)}
-              className="rounded-md p-2 text-red-400 hover:bg-red-500/10"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-3">
-          <label className="mb-1 block text-[10px] text-slate-500">
-            Change status
-          </label>
-
-          <select
-            value={ticket.status || "To Do"}
-            disabled={updatingTicketId === String(ticketId)}
-            onChange={(e) =>
-              handleStatusChange(ticketId, e.target.value)
-            }
-            className="w-full rounded-lg border border-slate-700 bg-[#101A32] px-3 py-2 text-xs text-white outline-none focus:border-blue-400 disabled:opacity-50"
-          >
-            {STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </div>
-      </article>
-    );
-  };
-
-  // ---------------- KANBAN COLUMNS ----------------
-
-  const KanbanColumn = ({ status, items }) => {
-    const Icon =
-      status === "Done"
-        ? CheckCircle2
-        : status === "In Progress"
-        ? Clock3
-        : Ticket;
-
-    return (
-      <div className="min-w-0 rounded-xl border border-slate-800 bg-[#101A32] p-3 sm:p-4">
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Icon
-              size={17}
-              className={
-                status === "Done"
-                  ? "text-emerald-400"
-                  : status === "In Progress"
-                  ? "text-yellow-400"
-                  : "text-blue-400"
-              }
-            />
-
-            <h3 className="text-sm font-bold text-white">{status}</h3>
-          </div>
-
-          <span className="rounded-full bg-slate-700 px-2.5 py-1 text-xs text-slate-300">
-            {items.length}
-          </span>
-        </div>
-
-        <div className="space-y-3">
-          {items.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-700 px-3 py-8 text-center text-xs text-slate-500">
-              No tickets here
-            </div>
-          ) : (
-            items.map((ticket) => (
-              <TicketCard key={getId(ticket)} ticket={ticket} />
-            ))
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // ---------------- MAIN UI ----------------
-
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#080D1C] text-white">
       <div className="flex min-h-screen">
-        {/* DESKTOP SIDEBAR */}
+
+        {/* Desktop Sidebar */}
         <div className="hidden w-[250px] shrink-0 lg:block">
           <Sidebar />
         </div>
 
-        {/* MOBILE SIDEBAR */}
+        {/* Mobile Sidebar */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <button
@@ -589,7 +376,8 @@ export default function Dashboard() {
         )}
 
         <main className="min-w-0 flex-1">
-          {/* HEADER */}
+
+          {/* Header */}
           <header className="sticky top-0 z-20 flex min-h-[76px] flex-col justify-between gap-4 border-b border-slate-800 bg-[#0B1223]/95 px-4 py-4 backdrop-blur-xl sm:flex-row sm:items-center sm:px-6 lg:px-8">
             <div className="flex items-center gap-3">
               <button
@@ -604,7 +392,6 @@ export default function Dashboard() {
                 <h1 className="text-xl font-bold text-white sm:text-2xl">
                   Welcome Back, {displayName}!
                 </h1>
-
                 <p className="mt-1 text-xs text-slate-400 sm:text-sm">
                   Manage your projects and track your work.
                 </p>
@@ -621,11 +408,7 @@ export default function Dashboard() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder={
-                    activeNav === "Tickets"
-                      ? "Search tickets..."
-                      : "Search projects..."
-                  }
+                  placeholder="Search projects..."
                   className="h-10 w-full rounded-lg border border-slate-700 bg-[#131E37] pl-10 pr-3 text-xs text-white outline-none focus:border-blue-400 sm:w-52"
                 />
               </div>
@@ -642,15 +425,13 @@ export default function Dashboard() {
               </div>
 
               <button
-                onClick={refreshAll}
-                disabled={loadingProjects || loadingTickets}
+                onClick={fetchProjects}
+                disabled={loadingProjects}
                 className="flex shrink-0 items-center gap-2 rounded-lg bg-yellow-400 px-3 py-3 text-xs font-bold text-black hover:bg-yellow-300 disabled:opacity-50"
               >
                 <RefreshCw
                   size={15}
-                  className={
-                    loadingProjects || loadingTickets ? "animate-spin" : ""
-                  }
+                  className={loadingProjects ? "animate-spin" : ""}
                 />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
@@ -658,17 +439,21 @@ export default function Dashboard() {
           </header>
 
           <div className="mx-auto w-full max-w-[1600px] space-y-6 p-4 sm:p-6 lg:p-7">
-            {/* ERROR */}
+
+            {/* Error */}
             {error && (
               <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
                 <div className="flex items-center gap-2">
                   <AlertCircle size={18} />
-                  <span>{error}</span>
+                  {error}
                 </div>
 
                 <button
-                  onClick={refreshAll}
-                  className="flex shrink-0 items-center gap-2"
+                  onClick={() => {
+                    fetchProjects();
+                    fetchTickets();
+                  }}
+                  className="flex items-center gap-2"
                 >
                   <RefreshCw size={15} />
                   Retry
@@ -676,7 +461,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* OVERVIEW */}
+            {/* Overview */}
             {activeNav === "Overview" && (
               <>
                 <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -708,7 +493,6 @@ export default function Dashboard() {
                   })}
                 </section>
 
-                {/* PROJECT OVERVIEW */}
                 <section className="rounded-xl border border-slate-800 bg-[#101A32] p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -742,7 +526,9 @@ export default function Dashboard() {
                         {search ? "No matching projects" : "No projects yet"}
                       </h3>
                       <p className="mt-2 text-xs text-slate-500">
-                        Create a project to get started.
+                        {search
+                          ? "Try another search."
+                          : "Your projects will appear here when available."}
                       </p>
                     </div>
                   ) : (
@@ -760,15 +546,12 @@ export default function Dashboard() {
                             size={21}
                             className="text-blue-400"
                           />
-
                           <h4 className="mt-3 font-semibold text-white">
                             {getProjectName(project)}
                           </h4>
-
                           <p className="mt-2 line-clamp-2 text-xs text-slate-400">
                             {project.description || "No description"}
                           </p>
-
                           <p className="mt-4 text-xs text-yellow-400">
                             Open tickets →
                           </p>
@@ -778,13 +561,11 @@ export default function Dashboard() {
                   )}
                 </section>
 
-                {/* TICKET PROGRESS */}
                 <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                   <div className="rounded-xl border border-slate-800 bg-[#101A32] p-5">
                     <h3 className="text-sm font-bold text-white">
                       Ticket Progress
                     </h3>
-
                     <p className="mt-1 text-xs text-slate-500">
                       Completion in selected project
                     </p>
@@ -793,7 +574,6 @@ export default function Dashboard() {
                       <span className="text-4xl font-bold text-white">
                         {completionPercentage}%
                       </span>
-
                       <span className="text-xs text-slate-400">
                         {completedTickets} of {totalTickets} completed
                       </span>
@@ -814,30 +594,15 @@ export default function Dashboard() {
 
                     <div className="mt-5 space-y-4">
                       {[
-                        {
-                          name: "To Do",
-                          count: todoTickets,
-                          color: "bg-blue-400",
-                        },
-                        {
-                          name: "In Progress",
-                          count: inProgressTickets,
-                          color: "bg-yellow-400",
-                        },
-                        {
-                          name: "Done",
-                          count: completedTickets,
-                          color: "bg-emerald-400",
-                        },
+                        { name: "To Do", count: todoTickets, color: "bg-blue-400" },
+                        { name: "In Progress", count: inProgressTickets, color: "bg-yellow-400" },
+                        { name: "Done", count: completedTickets, color: "bg-emerald-400" },
                       ].map((item) => (
                         <div key={item.name}>
                           <div className="mb-2 flex justify-between text-xs">
                             <span className="text-slate-300">{item.name}</span>
-                            <span className="text-slate-400">
-                              {item.count}
-                            </span>
+                            <span className="text-slate-400">{item.count}</span>
                           </div>
-
                           <div className="h-2 overflow-hidden rounded-full bg-slate-700">
                             <div
                               className={`h-full rounded-full ${item.color}`}
@@ -858,7 +623,7 @@ export default function Dashboard() {
               </>
             )}
 
-            {/* PROJECTS */}
+            {/* Projects */}
             {activeNav === "Projects" && (
               <section className="rounded-xl border border-slate-800 bg-[#101A32] p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -875,7 +640,6 @@ export default function Dashboard() {
                     <span className="rounded-lg bg-blue-500/10 px-3 py-2 text-xs text-blue-400">
                       {projects.length} Projects
                     </span>
-
                     <button
                       type="button"
                       onClick={() => setShowProjectModal(true)}
@@ -897,13 +661,13 @@ export default function Dashboard() {
                       size={42}
                       className="mx-auto text-slate-600"
                     />
-
                     <h3 className="mt-4 font-semibold text-white">
                       {search ? "No matching projects" : "No projects found"}
                     </h3>
-
                     <p className="mt-2 text-xs text-slate-500">
-                      Create a project before adding tickets.
+                      {search
+                        ? "Try another project name."
+                        : "Create a project before adding tickets."}
                     </p>
                   </div>
                 ) : (
@@ -921,15 +685,12 @@ export default function Dashboard() {
                           size={23}
                           className="text-blue-400"
                         />
-
                         <h3 className="mt-4 font-semibold text-white">
                           {getProjectName(project)}
                         </h3>
-
                         <p className="mt-2 line-clamp-2 text-xs text-slate-400">
                           {project.description || "No project description"}
                         </p>
-
                         <p className="mt-4 text-xs text-yellow-400">
                           Open project →
                         </p>
@@ -940,7 +701,7 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* TICKETS */}
+            {/* Tickets + Kanban */}
             {activeNav === "Tickets" && (
               <section className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -948,7 +709,6 @@ export default function Dashboard() {
                     <h2 className="text-lg font-bold text-white">
                       Project Tickets
                     </h2>
-
                     <p className="mt-1 text-xs text-slate-500">
                       {selectedProject
                         ? getProjectName(selectedProject)
@@ -963,7 +723,6 @@ export default function Dashboard() {
                       className="rounded-lg border border-slate-700 bg-[#101A32] px-3 py-2 text-sm text-white outline-none"
                     >
                       <option value="">Select project</option>
-
                       {projects.map((project) => (
                         <option
                           key={getId(project)}
@@ -975,7 +734,6 @@ export default function Dashboard() {
                     </select>
 
                     <button
-                      type="button"
                       onClick={() => setShowCreateModal(true)}
                       disabled={!selectedProjectId}
                       className="flex items-center gap-2 rounded-lg bg-yellow-400 px-4 py-2 text-sm font-bold text-black hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
@@ -996,57 +754,33 @@ export default function Dashboard() {
                       size={42}
                       className="mx-auto text-slate-600"
                     />
-
                     <h3 className="mt-4 font-semibold text-white">
                       Select a project
                     </h3>
-
                     <p className="mt-2 text-xs text-slate-500">
-                      Choose a project to view its tickets.
+                      Choose a project to open its Kanban board.
                     </p>
                   </div>
                 ) : (
-                  <>
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                      {STATUSES.map((status) => {
-                        const statusTickets = filteredTickets.filter(
-                          (ticket) => ticket.status === status
-                        );
-
-                        return (
-                          <KanbanColumn
-                            key={status}
-                            status={status}
-                            items={statusTickets}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    {filteredTickets.length === 0 && (
-                      <div className="rounded-xl border border-slate-800 bg-[#101A32] py-8 text-center text-sm text-slate-400">
-                        {search
-                          ? "No tickets match your search."
-                          : "No tickets created for this project yet. Click Create Ticket to add one."}
-                      </div>
-                    )}
-                  </>
+                  <KanbanBoard
+                    tickets={tickets}
+                    setTickets={setTickets}
+                    onTicketClick={setSelectedTicket}
+                  />
                 )}
               </section>
             )}
 
-            {/* TEAM AND SETTINGS */}
+            {/* Team and Settings placeholders */}
             {["Team", "Settings"].includes(activeNav) && (
               <section className="rounded-xl border border-slate-800 bg-[#101A32] p-10 text-center">
                 <Settings
                   className="mx-auto text-slate-500"
                   size={32}
                 />
-
                 <h2 className="mt-4 text-lg font-bold text-white">
                   {activeNav}
                 </h2>
-
                 <p className="mt-2 text-sm text-slate-400">
                   This section is not connected yet.
                 </p>
@@ -1061,7 +795,7 @@ export default function Dashboard() {
         </main>
       </div>
 
-      {/* CREATE PROJECT MODAL */}
+      {/* Create Project Modal */}
       {showProjectModal && (
         <CreateProjectModal
           onClose={() => setShowProjectModal(false)}
@@ -1069,7 +803,7 @@ export default function Dashboard() {
         />
       )}
 
-      {/* CREATE TICKET MODAL */}
+      {/* Create Ticket Modal */}
       {showCreateModal && selectedProjectId && (
         <CreateTicketModal
           projectId={selectedProjectId}
@@ -1078,7 +812,7 @@ export default function Dashboard() {
         />
       )}
 
-      {/* EDIT TICKET MODAL */}
+      {/* Edit Ticket Modal */}
       {editingTicket && (
         <EditTicketModal
           ticket={editingTicket}
@@ -1087,7 +821,7 @@ export default function Dashboard() {
         />
       )}
 
-      {/* TICKET DETAILS MODAL */}
+      {/* Ticket Details Modal */}
       {selectedTicket && (
         <TicketDetailsModal
           ticket={selectedTicket}
@@ -1099,6 +833,9 @@ export default function Dashboard() {
           onDelete={handleDeleteTicket}
         />
       )}
+
+      {/* AI Analytics Chatbot - available across Dashboard sections */}
+      <AIAnalyticsChatbot projectId={selectedProjectId} />
     </div>
   );
 }

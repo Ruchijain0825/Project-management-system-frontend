@@ -1,80 +1,98 @@
 
-import { MessageSquare, Pencil } from "lucide-react";
+import { GripVertical, MessageSquare, Pencil, Trash2 } from "lucide-react";
 
-const TicketCard = ({ ticket, onClick }) => {
-  if (!ticket) return null;
-
-  const ticketId = String(ticket._id || ticket.id || "unknown");
-
-  const priorityColors = {
-    Low: "text-blue-400 bg-blue-400/10",
-    Medium: "text-yellow-400 bg-yellow-400/10",
-    High: "text-orange-400 bg-orange-400/10",
-    Critical: "text-red-400 bg-red-400/10",
+function TicketCard({
+  ticket,
+  onClick,
+  onEdit,
+  onDelete,
+  dragAttributes,
+  dragListeners,
+}) {
+  const priorityStyles = {
+    Low: "bg-sky-500/10 text-sky-300 border-sky-500/20",
+    Medium: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
+    High: "bg-rose-500/10 text-rose-300 border-rose-500/20",
   };
 
-  const statusColors = {
-    "To Do": "text-slate-300 bg-slate-700",
-    "In Progress": "text-blue-400 bg-blue-400/10",
-    Done: "text-green-400 bg-green-400/10",
-  };
+  const priority = ticket.priority || "Medium";
 
   return (
-    <div
+    <article
       onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick?.();
-        }
-      }}
-      className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-yellow-400 transition cursor-pointer"
+      className="group cursor-pointer rounded-xl border border-slate-700/80 bg-slate-950 p-4 transition hover:-translate-y-0.5 hover:border-indigo-500/60 hover:shadow-lg hover:shadow-indigo-950/30"
     >
-      <div className="flex justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs text-slate-500 mb-2">
-            {ticket.type || "Task"} · #{ticketId.slice(-6).toUpperCase()}
-          </p>
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
+          <button
+            type="button"
+            {...dragAttributes}
+            {...dragListeners}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Drag ticket"
+            className="mt-0.5 cursor-grab touch-none rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-sky-400 active:cursor-grabbing"
+          >
+            <GripVertical size={17} />
+          </button>
 
-          <h3 className="text-white font-semibold break-words">
-            {ticket.title || "Untitled Ticket"}
-          </h3>
+          <h4 className="break-words text-sm font-semibold text-slate-100">
+            {ticket.title || "Untitled ticket"}
+          </h4>
         </div>
 
-        <span
-          className={`h-fit shrink-0 px-3 py-1 rounded-full text-xs ${
-            priorityColors[ticket.priority] || "text-gray-300 bg-gray-700"
-          }`}
-        >
-          {ticket.priority || "Medium"}
-        </span>
-      </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-500/10 hover:text-indigo-300"
+              aria-label="Edit ticket"
+            >
+              <Pencil size={14} />
+            </button>
+          )}
 
-      <p className="text-sm text-slate-400 mt-3 break-words">
-        {ticket.description || "No description"}
-      </p>
-
-      <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-800">
-        <span
-          className={`px-3 py-1 rounded-full text-xs ${
-            statusColors[ticket.status] || "text-gray-300 bg-gray-700"
-          }`}
-        >
-          {ticket.status || "To Do"}
-        </span>
-
-        <div className="flex items-center gap-3 text-slate-400">
-          <span className="flex items-center gap-1 text-xs">
-            <MessageSquare size={15} />
-            Comments
-          </span>
-          <Pencil size={15} />
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-500/10 hover:text-rose-300"
+              aria-label="Delete ticket"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
         </div>
       </div>
-    </div>
+
+      {ticket.description && (
+        <p className="mb-4 line-clamp-2 text-xs leading-5 text-slate-400">
+          {ticket.description}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className={`rounded-md border px-2 py-1 text-[10px] font-semibold ${
+            priorityStyles[priority] || priorityStyles.Medium
+          }`}
+        >
+          {priority}
+        </span>
+
+        <div className="flex items-center gap-1 text-xs text-slate-500">
+          <MessageSquare size={13} />
+          <span>{ticket.comments?.length || 0}</span>
+        </div>
+      </div>
+    </article>
   );
-};
+}
 
 export default TicketCard;

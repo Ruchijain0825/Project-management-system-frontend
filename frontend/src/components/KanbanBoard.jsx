@@ -1,252 +1,181 @@
 
-import { useMemo, useState } from "react";
-import { DragDropContext } from "@hello-pangea/dnd";
-import { Search, RotateCcw } from "lucide-react";
-import { Droppable, Draggable } from "@hello-pangea/dnd";
-import KanbanColumn from "./KanbanColoumn";
+import { useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { Search } from "lucide-react";
 import api from "../services/api";
+import KanbanColumn from "./KanbanColoumn";
 
 const STATUSES = ["To Do", "In Progress", "Done"];
 
-const getTicketId = (ticket) =>
-  String(ticket?._id || ticket?.id || "");
+const getId = (ticket) => String(ticket._id || ticket.id);
 
-const KanbanBoard = ({
+function KanbanBoard({
   tickets = [],
   setTickets,
   onTicketClick,
-}) => {
+  onEditTicket,
+  onDeleteTicket,
+}) {
   const [search, setSearch] = useState("");
-  const [priority, setPriority] = useState("All");
-  const [status, setStatus] = useState("All");
-  const [sortBy, setSortBy] = useState("newest");
+  const [error, setError] = useState("");
 
-  const safeTickets = Array.isArray(tickets) ? tickets : [];
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-  const filteredTickets = useMemo(() => {
-    let result = safeTickets.filter(
-      (ticket) => ticket && getTicketId(ticket)
+  const visibleTickets = tickets.filter((ticket) => {
+    const query = search.toLowerCase();
+    return (
+      (ticket.title || "").toLowerCase().includes(query) ||
+      (ticket.description || "").toLowerCase().includes(query)
+    );
+  });
+
+  const handleDragEnd = async ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+
+    setError("");
+
+    const activeTicket = tickets.find(
+      (ticket) => getId(ticket) === String(active.id)
     );
 
-    if (search.trim()) {
-      const query = search.toLowerCase().trim();
+    if (!activeTicket) return;
 
-      result = result.filter((ticket) =>
-        String(ticket.title || "").toLowerCase().includes(query) ||
-        String(ticket.description || "").toLowerCase().includes(query)
+    const overTicket = tickets.find(
+      (ticket) => getId(ticket) === String(over.id)
+    );
+
+    const sourceStatus = activeTicket.status;
+    const destinationStatus = overTicket
+      ? overTicket.status
+      : String(over.id);
+
+    if (!STATUSES.includes(destinationStatus)) return;
+
+    const previousTickets = [...tickets];
+
+    // Moving between columns
+    if (sourceStatus !== destinationStatus) {
+      const updatedTickets = tickets.map((ticket) =>
+        getId(ticket) === String(active.id)
+          ? { ...ticket, status: destinationStatus }
+          : ticket
       );
-    }
 
-    if (priority !== "All") {
-      result = result.filter(
-        (ticket) => ticket.priority === priority
-      );
-    }
+      setTickets(updatedTickets);
 
-    if (status !== "All") {
-      result = result.filter(
-        (ticket) => ticket.status === status
-      );
-    }
-
-    result = [...result];
-
-    result.sort((a, b) => {
-      if (sortBy === "newest") {
-        return new Date(b.createdAt || 0) -
-          new Date(a.createdAt || 0);
-      }
-
-      if (sortBy === "oldest") {
-        return new Date(a.createdAt || 0) -
-          new Date(b.createdAt || 0);
-      }
-
-      if (sortBy === "title") {
-        return String(a.title || "").localeCompare(
-          String(b.title || "")
+      try {
+        await api.put(`/tickets/${active.id}`, {
+          status: destinationStatus,
+        });
+      } catch (err) {
+        setTickets(previousTickets);
+        setError(
+          err.response?.data?.message || "Unable to update ticket status."
         );
       }
 
-      if (sortBy === "priority") {
-        const order = {
-          Critical: 4,
-          High: 3,
-          Medium: 2,
-          Low: 1,
-        };
-
-        return (order[b.priority] || 0) -
-          (order[a.priority] || 0);
-      }
-
-      return 0;
-    });
-
-    return result;
-  }, [safeTickets, search, priority, status, sortBy]);
-
-  const resetFilters = () => {
-    setSearch("");
-    setPriority("All");
-    setStatus("All");
-    setSortBy("newest");
-  };
-
-  const handleDragEnd = async (result) => {
-    const { source, destination, draggableId } = result;
-
-    if (!destination || !setTickets) return;
-
-    if (
-      source.droppableId === destination.droppableId &&
-      source.index === destination.index
-    ) {
       return;
     }
 
-    const ticket = safeTickets.find(
-      (item) => getTicketId(item) === draggableId
+    // Reordering inside the same column
+    if (!overTicket || overTicket.status !== sourceStatus) return;
+
+    const columnTickets = tickets.filter(
+      (ticket) => ticket.status === sourceStatus
     );
 
-    if (!ticket) return;
-
-    const newStatus = destination.droppableId;
-
-    if (!STATUSES.includes(newStatus)) return;
-    if (ticket.status === newStatus) return;
-
-    const previousTickets = [...safeTickets];
-
-    const updatedTickets = safeTickets.map((item) =>
-      getTicketId(item) === draggableId
-        ? { ...item, status: newStatus }
-        : item
+    const oldIndex = columnTickets.findIndex(
+      (ticket) => getId(ticket) === String(active.id)
     );
 
-    setTickets(updatedTickets);
+    const newIndex = columnTickets.findIndex(
+      (ticket) => getId(ticket) === String(over.id)
+    );
 
-    try {
-      await api.put(`/tickets/${draggableId}`, {
-        status: newStatus,
-      });
-    } catch (error) {
-      console.error("Ticket status update failed:", error);
-      setTickets(previousTickets);
+    if (oldIndex === -1 || newIndex === -1) return;
 
-      alert(
-        error.response?.data?.message ||
-        "Could not update ticket status"
-      );
-    }
+    const reorderedColumn = arrayMove(columnTickets, oldIndex, newIndex);
+    let position = 0;
+
+    const reorderedTickets = tickets.map((ticket) => {
+      if (ticket.status !== sourceStatus) return ticket;
+      return reorderedColumn[position++];
+    });
+
+    setTickets(reorderedTickets);
   };
 
   return (
     <div className="space-y-5">
-
-      <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
-        <div className="flex flex-col gap-3 lg:flex-row">
-
-          <div className="relative flex-1">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tickets..."
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 py-2.5 pl-10 pr-4 text-white outline-none focus:border-yellow-400"
-            />
-          </div>
-
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-white"
-          >
-            <option value="All">All Priorities</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
-
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-white"
-          >
-            <option value="All">All Statuses</option>
-            {STATUSES.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-white"
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="title">Title A-Z</option>
-            <option value="priority">Priority</option>
-          </select>
-
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-gray-300 hover:bg-gray-700"
-          >
-            <RotateCcw size={16} />
-            Reset
-          </button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-white">Kanban Board</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Drag and drop tickets to update their progress.
+          </p>
         </div>
 
-        <p className="mt-3 text-xs text-gray-400">
-          Showing {filteredTickets.length} of {safeTickets.length} tickets
-        </p>
+        <div className="relative w-full sm:w-72">
+          <Search
+            size={17}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search tickets..."
+            className="w-full rounded-xl border border-slate-700 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-white outline-none transition focus:border-indigo-500"
+          />
+        </div>
       </div>
 
-      {safeTickets.length === 0 ? (
-        <div className="rounded-xl border border-gray-800 bg-gray-900 py-12 text-center text-gray-400">
-          No tickets created yet. Click Create Ticket to get started.
-        </div>
-      ) : (
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {STATUSES
-              .filter((item) => status === "All" || status === item)
-              .map((columnStatus) => {
-                const columnTickets = filteredTickets.filter(
-                  (ticket) => ticket.status === columnStatus
-                );
-
-                return (
-                  <KanbanColumn
-                    key={columnStatus}
-                    status={columnStatus}
-                    tickets={columnTickets}
-                    onTicketClick={onTicketClick}
-                  />
-                );
-              })}
-          </div>
-        </DragDropContext>
-      )}
-
-      {safeTickets.length > 0 && filteredTickets.length === 0 && (
-        <p className="py-4 text-center text-gray-400">
-          No tickets match your search or filters.
+      {error && (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {error}
         </p>
       )}
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {STATUSES.map((status) => (
+            <KanbanColumn
+              key={status}
+              status={status}
+              tickets={visibleTickets.filter(
+                (ticket) => ticket.status === status
+              )}
+              onTicketClick={onTicketClick}
+              onEditTicket={onEditTicket}
+              onDeleteTicket={onDeleteTicket}
+            />
+          ))}
+        </div>
+      </DndContext>
     </div>
   );
-};
+}
 
 export default KanbanBoard;
