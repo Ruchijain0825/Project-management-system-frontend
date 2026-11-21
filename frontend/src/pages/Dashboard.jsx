@@ -19,6 +19,7 @@ import {
   AlertCircle,
   RefreshCw,
   ChevronDown,
+  CalendarDays,
 } from "lucide-react";
 
 import api from "../services/api";
@@ -28,12 +29,15 @@ import CreateProjectModal from "../components/CreateProjectModal";
 import EditTicketModal from "../components/EditTicketModal";
 import TicketDetailsModal from "../components/TicketDetailsModal";
 import AIAnalyticsChatbot from "../components/AiAnalyticsChatbot";
+import TeamMembers from "../components/TeamMember";
+import Calendar from "../components/Calendar";
 
 const navigation = [
   { name: "Overview", icon: LayoutDashboard },
   { name: "Projects", icon: FolderKanban },
   { name: "Tickets", icon: Ticket },
   { name: "Team", icon: Users },
+  { name: "Calendar", icon: CalendarDays },
   { name: "Settings", icon: Settings },
 ];
 
@@ -771,18 +775,34 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* Team and Settings placeholders */}
-            {["Team", "Settings"].includes(activeNav) && (
+            {/* Team Management */}
+            {activeNav === "Team" && (
+              <TeamMembers
+                projects={projects}
+                initialProjectId={selectedProjectId}
+              />
+            )}
+
+            {/* Calendar */}
+            {activeNav === "Calendar" && (
+              <Calendar
+                tickets={tickets}
+                onTicketClick={setSelectedTicket}
+              />
+            )}
+
+            {/* Settings */}
+            {activeNav === "Settings" && (
               <section className="rounded-xl border border-slate-800 bg-[#101A32] p-10 text-center">
                 <Settings
                   className="mx-auto text-slate-500"
                   size={32}
                 />
                 <h2 className="mt-4 text-lg font-bold text-white">
-                  {activeNav}
+                  Settings
                 </h2>
                 <p className="mt-2 text-sm text-slate-400">
-                  This section is not connected yet.
+                  Settings section is not connected yet.
                 </p>
               </section>
             )}
