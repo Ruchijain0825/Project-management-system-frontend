@@ -29,7 +29,8 @@ import CreateProjectModal from "../components/CreateProjectModal";
 import EditTicketModal from "../components/EditTicketModal";
 import TicketDetailsModal from "../components/TicketDetailsModal";
 import AIAnalyticsChatbot from "../components/AiAnalyticsChatbot";
-import TeamMembers from "../components/TeamMember";
+import TeamMembers from
+ "../components/TeamMember";
 import Calendar from "../components/Calendar";
 
 const navigation = [
